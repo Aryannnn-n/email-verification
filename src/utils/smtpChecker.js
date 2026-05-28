@@ -1,7 +1,7 @@
 import net from 'node:net';
 
 const SMTP_PORT = 25;
-const SMTP_TIMEOUT = 10000;
+const SMTP_TIMEOUT = 2500;
 const SENDER_EMAIL = 'verify@emailchecker.dev';
 
 // Wait and read the next SMTP response message from the server socket

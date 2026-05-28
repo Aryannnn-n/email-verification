@@ -76,11 +76,17 @@ export const verifyEmail = async (email) => {
     });
   }
 
-  // 4. SMTP mail presence check
+  // 4. SMTP mail presence check (try top 2 MX servers, fail fast if connection is blocked)
   let smtpResult = null;
-  for (const mxHost of mxResult.records) {
+  const hostsToTry = mxResult.records.slice(0, 2);
+
+  for (const mxHost of hostsToTry) {
     smtpResult = await checkMailbox(email, mxHost);
     if (smtpResult.exists === true || smtpResult.exists === false) {
+      break;
+    }
+    // If the connection was blocked or timed out, don't waste time trying backup servers
+    if (smtpResult.error === 'connection_timeout' || smtpResult.error === 'connection_refused') {
       break;
     }
   }
