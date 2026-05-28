@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Verifier — SMTP Verification & Typo Detection</title>
+  <meta name="description"
+    content="Verify email addresses in real-time with SMTP mailbox checking, DNS resolver, and typo corrections.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    body {
+      background-color: #0b0f19;
+    }
+
+    .glow-dot-1 {
+      filter: blur(120px);
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, rgba(0, 0, 0, 0) 70%);
+    }
+
+    .glow-dot-2 {
+      filter: blur(120px);
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, rgba(0, 0, 0, 0) 70%);
+    }
+  </style>
+</head>
+
+<body class="font-sans text-slate-200 min-h-screen flex flex-col relative overflow-x-hidden">
+  <!-- Background Glow Effects -->
+  <div class="absolute top-0 left-0 w-[500px] h-[500px] glow-dot-1 -z-10 pointer-events-none"></div>
+  <div class="absolute bottom-0 right-0 w-[600px] h-[600px] glow-dot-2 -z-10 pointer-events-none"></div>
+
+  <main class="flex-1 flex flex-col items-center justify-center px-6 py-12 md:py-24 max-w-4xl mx-auto w-full">
+    <!-- Header -->
+    <header class="text-center mb-10 space-y-4">
+      <div
+        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold uppercase tracking-wider">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z">
+          </path>
+        </svg>
+        SMTP Verification Engine
+      </div>
+      <h1
+        class="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
+        Verify Email Mailboxes
+      </h1>
+      <p class="text-slate-400 max-w-lg mx-auto text-base md:text-lg">
+        Check syntax, perform DNS MX lookups, verify SMTP mailbox existence in real-time, and catch typos automatically.
+      </p>
+    </header>
+
+    <!-- Search Section -->
+    <div
+      class="w-full max-w-2xl bg-slate-900/50 backdrop-blur-xl border border-slate-800 p-2 rounded-2xl shadow-2xl flex flex-col md:flex-row gap-2 transition-all duration-300 focus-within:border-indigo-500/50 focus-within:ring-2 focus-within:ring-indigo-500/10">
+      <input type="email" id="emailInput" placeholder="Enter an email to verify (e.g. user@gmial.com)..."
+        class="flex-1 bg-transparent px-4 py-3.5 outline-none text-slate-100 placeholder-slate-500 text-base"
+        autocomplete="off" autofocus>
+      <button id="verifyBtn" onclick="handleVerify()"
+        class="bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white px-8 py-3.5 rounded-xl font-semibold text-base transition-all duration-150 shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2">
+        <span>Verify Email</span>
+      </button>
+    </div>
+
+    <!-- Loader -->
+    <div id="loader" class="hidden flex-col items-center justify-center w-full mt-12 animate-pulse">
+      <div class="w-10 h-10 border-4 border-slate-800 border-t-indigo-500 rounded-full animate-spin"></div>
+
+      <p class="text-slate-400 text-sm font-medium text-center">
+        Checking SMTP Mailbox Exchange...
+      </p>
+    </div>
+
+    <!-- Result Dashboard -->
+    <div id="resultCard"
+      class="hidden w-full max-w-2xl mt-8 bg-slate-950/60 backdrop-blur-2xl border border-slate-800 rounded-2xl overflow-hidden shadow-2xl transition-all duration-300">
+      <!-- Card Header -->
+      <div class="px-6 py-5 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div id="statusDot" class="w-3.5 h-3.5 rounded-full animate-ping"></div>
+          <span id="statusBadge" class="text-xs uppercase font-extrabold tracking-widest px-3 py-1 rounded-full"></span>
+        </div>
+        <span id="resultEmail"
+          class="font-mono text-sm text-slate-300 font-semibold truncate max-w-xs md:max-w-md"></span>
+      </div>
+
+      <!-- Card Body -->
+      <div class="p-6 space-y-6">
+        <!-- Did You Mean Banner -->
+        <div id="dymBanner"
+          class="hidden items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/20 text-amber-300 rounded-xl text-sm leading-relaxed">
+          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z">
+            </path>
+          </svg>
+          <div>
+            Did you mean <strong id="dymSuggestion"
+              class="underline cursor-pointer hover:text-amber-200 transition-colors"
+              onclick="useSuggestion()"></strong>? Click to check.
+          </div>
+        </div>
+
+        <!-- Metric Grid -->
+        <div id="resultGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Dynamic metrics populated by JS -->
+        </div>
+
+        <!-- Raw JSON Inspector -->
+        <div class="border-t border-slate-800/60 pt-6">
+          <button onclick="toggleJson()"
+            class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-300 transition-colors duration-150">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5"></path>
+            </svg>
+            Raw API Response JSON
+          </button>
+          <div id="jsonViewer"
+            class="hidden mt-4 p-4 rounded-xl bg-slate-900 border border-slate-800/60 overflow-x-auto">
+            <pre id="jsonContent" class="font-mono text-xs text-slate-400 leading-normal whitespace-pre"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feature highlights -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-3xl mt-16 text-center">
+      <div class="p-4 rounded-xl bg-slate-900/25 border border-slate-800/60">
+        <span class="text-xl">📧</span>
+        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mt-2">Syntax Regex</h4>
+      </div>
+      <div class="p-4 rounded-xl bg-slate-900/25 border border-slate-800/60">
+        <span class="text-xl">🌐</span>
+        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mt-2">MX Lookup</h4>
+      </div>
+      <div class="p-4 rounded-xl bg-slate-900/25 border border-slate-800/60">
+        <span class="text-xl">🔌</span>
+        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mt-2">SMTP RCPT</h4>
+      </div>
+      <div class="p-4 rounded-xl bg-slate-900/25 border border-slate-800/60">
+        <span class="text-xl">✨</span>
+        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mt-2">Fuzzy Typos</h4>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="py-6 border-t border-slate-800 text-center text-xs text-slate-500">
+    Intern Submission Module · Express.js Backend · Tailwind CSS Frontend
+  </footer>
+
+  <script>
+    const input = document.getElementById('emailInput');
+    const btn = document.getElementById('verifyBtn');
+    const loader = document.getElementById('loader');
+    const resultCard = document.getElementById('resultCard');
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleVerify();
+    });
+
+    async function handleVerify() {
+      const email = input.value.trim();
+      if (!email) { input.focus(); return; }
+
+      // Reset state
+      btn.disabled = true;
+      resultCard.classList.add('hidden');
+      loader.classList.remove('hidden');
+      loader.classList.add('flex');
+
+      try {
+        const res = await fetch('/api/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        const data = await res.json();
+        renderResult(data);
+      } catch (err) {
+        renderResult({
+          email,
+          result: 'unknown',
+          resultcode: 3,
+          subresult: 'network_error',
+          error: err.message,
+          domain: '',
+          mxRecords: [],
+          didyoumean: null,
+          executiontime: 0,
+          timestamp: new Date().toISOString()
+        });
+      } finally {
+        loader.classList.add('hidden');
+        loader.classList.remove('flex');
+        btn.disabled = false;
+      }
+    }
+
+    function renderResult(data) {
+      // Set status badge and colors
+      const dot = document.getElementById('statusDot');
+      const badge = document.getElementById('statusBadge');
+
+      let badgeClasses = '';
+      let dotClasses = '';
+
+      if (data.result === 'valid') {
+        badgeClasses = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+        dotClasses = 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]';
+      } else if (data.result === 'invalid') {
+        badgeClasses = 'bg-rose-500/10 text-rose-400 border border-rose-500/20';
+        dotClasses = 'bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.5)]';
+      } else {
+        badgeClasses = 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+        dotClasses = 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]';
+      }
+
+      badge.className = `text-xs uppercase font-extrabold tracking-widest px-3 py-1 rounded-full ${badgeClasses}`;
+      badge.textContent = data.result;
+      dot.className = `w-3 h-3 rounded-full animate-pulse ${dotClasses}`;
+
+      document.getElementById('resultEmail').textContent = data.email || '—';
+
+      // Did You Mean typo alert
+      const dym = document.getElementById('dymBanner');
+      if (data.didyoumean) {
+        document.getElementById('dymSuggestion').textContent = data.didyoumean;
+        dym.classList.remove('hidden');
+        dym.classList.add('flex');
+      } else {
+        dym.classList.add('hidden');
+        dym.classList.remove('flex');
+      }
+
+      // Populate Metric Grid
+      const grid = document.getElementById('resultGrid');
+      const items = [
+        { label: 'Sub-Result', value: data.subresult || '—', color: 'text-slate-200' },
+        { label: 'Result Code', value: data.resultcode, color: 'text-slate-200 font-mono' },
+        { label: 'Domain Name', value: data.domain || '—', color: 'text-slate-300' },
+        { label: 'Execution Speed', value: `${data.executiontime} seconds`, color: 'text-slate-300' },
+        { label: 'Target MX Host', value: data.mxRecords?.[0] || '—', color: 'text-slate-400 font-mono truncate' },
+        { label: 'System Errors', value: data.error || 'None', color: data.error ? 'text-rose-400' : 'text-slate-400' }
+      ];
+
+      grid.innerHTML = items.map(item => `
+        <div class="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 space-y-1">
+          <span class="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">${item.label}</span>
+          <span class="block text-sm font-semibold ${item.color}">${item.value}</span>
+        </div>
+      `).join('');
+
+      // JSON viewer content
+      document.getElementById('jsonContent').textContent = JSON.stringify(data, null, 2);
+      document.getElementById('jsonViewer').classList.add('hidden');
+
+      resultCard.classList.remove('hidden');
+    }
+
+    function toggleJson() {
+      const viewer = document.getElementById('jsonViewer');
+      viewer.classList.toggle('hidden');
+    }
+
+    function useSuggestion() {
+      input.value = document.getElementById('dymSuggestion').textContent;
+      handleVerify();
+    }
+  </script>
+</body>
+
+</html>
